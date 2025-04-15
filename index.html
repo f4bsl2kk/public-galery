@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Anonyme Bild-Galerie</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    form, .dropzone {
+      margin-bottom: 30px;
+    }
+
+    input[type="file"] {
+      margin-right: 10px;
+    }
+
+    .dropzone {
+      border: 3px dashed #999;
+      padding: 30px;
+      background: #fff;
+      color: #666;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .dropzone.dragover {
+      background: #e0ffe0;
+      color: #111;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .image-box {
+      position: relative;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+
+    .image-box img {
+      width: 100%;
+      display: block;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 0, 0, 0.8);
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      font-size: 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      display: none;
+    }
+
+    .admin .delete-btn {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Anonyme Bild-Galerie</h1>
+  <p>Jede:r kann ein Bild hochladen – völlig anonym.</p>
+
+  <form action="/upload" method="POST" enctype="multipart/form-data">
+    <input type="file" name="image" accept="image/*" required>
+    <button type="submit">Bild hochladen</button>
+  </form>
+
+  <div class="dropzone" id="dropzone">
+    Ziehe ein Bild hierher, um es hochzuladen
+  </div>
+
+  <div class="gallery" id="gallery"></div>
+
+  <script>
+    const isAdmin = new URLSearchParams(window.location.search).get('admin') === 'true';
+
+    async function loadImages() {
+      const res = await fetch('/images');
+      const files = await res.json();
+
+      const gallery = document.getElementById('gallery');
+      gallery.innerHTML = '';
+
+      files.reverse().forEach(file => {
+        const box = document.createElement('div');
+        box.className = 'image-box' + (isAdmin ? ' admin' : '');
+        
+        const img = document.createElement('img');
+        img.src = `/uploads/${file}`;
+        img.alt = 'Anonymes Bild';
+        
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.textContent = 'Löschen';
+        delBtn.onclick = async () => {
+          const confirmed = confirm(`Bild wirklich löschen?`);
+          if (confirmed) {
+            const res = await fetch(`/delete/${file}`, { method: 'DELETE' });
+            if (res.ok) loadImages();
+            else alert('Fehler beim Löschen');
+          }
+        };
+
+        box.appendChild(img);
+        box.appendChild(delBtn);
+        gallery.appendChild(box);
+      });
+    }
+
+    loadImages();
+
+    // Drag & Drop Upload
+    const dropzone = document.getElementById('dropzone');
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (!file || !file.type.startsWith('image/')) {
+        alert('Nur Bilddateien erlaubt!');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      fetch('/upload', {
+        method: 'POST',
+        body: formData
+      }).then(() => {
+        loadImages();
+      }).catch(() => {
+        alert('Upload fehlgeschlagen.');
+      });
+    });
+  </script>
+
+</body>
+</html>
